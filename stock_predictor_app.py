@@ -2,7 +2,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import TimeSeriesSplit, cross_val_score
 from sklearn.metrics import accuracy_score
 import datetime
 import smtplib
@@ -71,6 +71,20 @@ def create_features(df):
     df['Momentum'] = df['Adj Close'] - df['Adj Close'].shift(5)
     df['SMA_20'] = df['Adj Close'].rolling(window=20).mean()
     df['SMA_50'] = df['Adj Close'].rolling(window=50).mean()
+
+    # Bollinger Bands
+    rolling_std = df['Adj Close'].rolling(window=20).std()
+    df['BB_upper'] = df['SMA_20'] + (2 * rolling_std)
+    df['BB_lower'] = df['SMA_20'] - (2 * rolling_std)
+
+    # RSI
+    delta = df['Adj Close'].diff()
+    up = delta.clip(lower=0)
+    down = -delta.clip(upper=0)
+    roll_up = up.rolling(14).mean()
+    roll_down = down.rolling(14).mean()
+    rs = roll_up / roll_down
+    df['RSI_14'] = 100 - (100 / (1 + rs))
     
     # MACD
     df['EMA_12'] = df['Adj Close'].ewm(span=12, adjust=False).mean()
@@ -86,16 +100,19 @@ def create_features(df):
 
 
 def train_model(df):
-    features = ['Return', 'Volatility', 'Momentum', 'SMA_20', 'SMA_50']
+    features = ['Return', 'Volatility', 'Momentum', 'SMA_20', 'SMA_50',
+                'BB_upper', 'BB_lower', 'RSI_14', 'MACD', 'Signal']
     X = df[features]
     y = df['Target'].astype(int)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
 
-    model = LogisticRegression()
-    model.fit(X_train, y_train)
+    tscv = TimeSeriesSplit(n_splits=5)
+    model = LogisticRegression(max_iter=500)
+    cv_scores = cross_val_score(model, X, y, cv=tscv, scoring='accuracy')
+
+    model.fit(X, y)
 
     prob = model.predict_proba([X.iloc[-1]])[0][1]
-    return model, prob, accuracy_score(y_test, model.predict(X_test))
+    return model, prob, cv_scores.mean()
 
 def analyze_stock(ticker):
     df = get_stock_data(ticker)
@@ -117,7 +134,7 @@ def analyze_stock(ticker):
         body = f"{ticker.upper()} has reached the target price of ${target_price:.2f}. Current price is ${current_price:.2f}. Consider selling."
         send_email_alert(subject, body)
 
-    return probability, verdict
+    return probability, verdict, accuracy
 
 if __name__ == '__main__':
     ticker_input = input("Enter stock ticker (e.g. AAPL): ").upper()

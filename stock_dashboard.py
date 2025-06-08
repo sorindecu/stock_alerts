@@ -6,6 +6,9 @@ import yfinance as yf
 
 st.set_page_config(page_title="Stock Forecast Dashboard", layout="centered")
 st.title("📈 Stock Forecast Dashboard")
+st.markdown(
+    "**Disclaimer:** This dashboard is for informational purposes only and does not constitute financial advice."
+)
 
 def fetch_news(ticker):
     url = f"https://finviz.com/quote.ashx?t={ticker}"
@@ -36,16 +39,18 @@ if st.button("Analyze"):
         try:
             df = get_stock_data(ticker)
             df = create_features(df)
-            prob, verdict = analyze_stock(ticker)
+            prob, verdict, accuracy = analyze_stock(ticker)
 
             st.success(f"**Verdict**: {verdict}")
             st.metric(label="Probability of Increase", value=f"{prob:.2%}")
+            st.metric(label="Cross-Val Accuracy", value=f"{accuracy:.2%}")
 
             st.subheader(f"Price Chart for {ticker}")
             st.line_chart(df['Adj Close'])
 
             st.subheader("Technical Indicators")
-            st.write(df[['SMA_20', 'SMA_50', 'Momentum', 'Volatility']].tail(1))
+            st.write(df[['SMA_20', 'SMA_50', 'Momentum', 'Volatility',
+                         'BB_upper', 'BB_lower', 'RSI_14']].tail(1))
 
             st.subheader("MACD Indicator")
             st.line_chart(df[['MACD', 'Signal']].dropna())
@@ -63,3 +68,7 @@ if st.button("Analyze"):
 
         except Exception as e:
             st.error(f"Error: {e}")
+
+        st.markdown(
+            "**Reminder:** Past performance does not guarantee future results."
+        )
