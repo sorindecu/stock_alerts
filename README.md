@@ -22,7 +22,7 @@ stock_predictor_app.py   → Core engine: data fetching, feature engineering, ML
 dashboard.py             → Streamlit dashboard for interactive analysis
 Setup
 bash# Clone the repo
-git clone https://github.com/yourusername/stock_alerts.git
+git clone https://github.com/sorindecu/stock_alerts.git
 cd stock_alerts
 
 # Install dependencies
